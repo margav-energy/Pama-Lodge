@@ -1,0 +1,33 @@
+services:
+  # PostgreSQL Database
+  - type: pspg
+    name: pama-lodge-db
+    databaseName: pama_lodge
+    user: pama_lodge_user
+    plan: free
+
+  # Django Backend
+  - type: web
+    name: pama-lodge-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: gunicorn pama_lodge.wsgi:application
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: False
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pama-lodge-db
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        value: pama-lodge-backend.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://pama-lodge-frontend.onrender.com
+    rootDir: backend
+
+  # React Frontend (Static Site)
+  # Note: Static sites on Render are configured via the dashboard
+  # This is a reference - use the dashboard for static site deployment
+

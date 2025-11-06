@@ -1,5 +1,9 @@
 import axios from 'axios'
 import offlineStorage from './offlineStorage'
+import API_BASE_URL from '../config'
+
+// Ensure axios uses the correct base URL
+axios.defaults.baseURL = API_BASE_URL
 
 class SyncService {
   constructor() {

@@ -183,6 +183,10 @@ Pama Lodge/
     └── vite.config.js
 ```
 
+## Deployment
+
+For deploying to production, see [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md) for detailed instructions on deploying to Render.
+
 ## Notes
 
 - The system maintains a complete audit trail of all booking changes
