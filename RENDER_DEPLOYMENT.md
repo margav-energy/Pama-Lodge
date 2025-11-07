@@ -22,25 +22,27 @@ This guide will help you deploy both the Django backend and React frontend on Re
 4. Click **"Create Database"**
 5. **Important**: Copy the **Internal Database URL** - you'll need this for your backend
 
-## Part 2: Deploy Django Backend
+## Part 2: Deploy Django Backend (with Frontend)
+
+The frontend is now built and served from the Django backend. This means you only need to deploy one service.
 
 ### Step 1: Create Web Service
 
 1. In Render Dashboard, click **"New +"** → **"Web Service"**
 2. Connect your GitHub repository: `margav-energy/Pama-Lodge`
 3. Configure:
-   - **Name**: `pama-lodge-backend`
+   - **Name**: `pama-lodge`
    - **Region**: Same as database
    - **Branch**: `main`
-   - **Root Directory**: `backend`
+   - **Root Directory**: (leave empty - root of repository)
    - **Runtime**: `Python 3`
    - **Build Command**: 
      ```bash
-     pip install -r requirements.txt && python manage.py collectstatic --noinput
+     cd frontend && npm install && npm run build && cd .. && cd backend && pip install -r requirements.txt && python manage.py collectstatic --noinput
      ```
    - **Start Command**: 
      ```bash
-     gunicorn pama_lodge.wsgi:application
+     cd backend && gunicorn pama_lodge.wsgi:application
      ```
 
 ### Step 2: Add Environment Variables
@@ -59,17 +61,16 @@ DATABASE_URL=<Internal Database URL from PostgreSQL service>
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
-**After Frontend is Deployed, Add:**
+**After Deployment, Add:**
 ```
-ALLOWED_HOSTS=pama-lodge-backend.onrender.com
-CORS_ALLOWED_ORIGINS=https://pama-lodge-frontend.onrender.com
+ALLOWED_HOSTS=pama-lodge.onrender.com
 ```
 
 **Important Notes:**
 - Use the **Internal Database URL** (not External) for `DATABASE_URL`
 - You'll get the Internal URL from your PostgreSQL service → **Info** tab
-- Update `CORS_ALLOWED_ORIGINS` after you know your frontend URL
-- Update `ALLOWED_HOSTS` with your actual backend URL
+- Update `ALLOWED_HOSTS` with your actual service URL (e.g., `pama-lodge.onrender.com`)
+- Since frontend is served from the same domain, CORS is not needed
 
 ### Step 3: Run Migrations
 
@@ -82,93 +83,54 @@ After deployment, run migrations:
    python manage.py create_rooms
    ```
 
-## Part 3: Deploy React Frontend
+## Part 3: Frontend is Built from Backend
 
-### Option A: Static Site (Recommended)
+**Note**: The frontend is now built and served from the Django backend. You don't need a separate frontend service. The build command in Step 1 handles building the React app, and Django serves it automatically.
 
-1. In Render Dashboard, click **"New +"** → **"Static Site"**
-2. Connect your GitHub repository: `margav-energy/Pama-Lodge`
-3. Configure:
-   - **Name**: `pama-lodge-frontend`
-   - **Branch**: `main`
-   - **Root Directory**: `frontend`
-   - **Build Command**: `npm install && npm run build`
-   - **Publish Directory**: `dist`
-
-### Update Frontend Environment Variables
-
-**Important**: After your backend is deployed, get its URL (e.g., `https://pama-lodge-backend.onrender.com`)
-
-In Render Static Site settings → **Environment**, add:
-
-```
-VITE_API_URL=https://pama-lodge-backend.onrender.com
-```
-
-(Replace with your actual backend URL - it will be something like `https://pama-lodge-backend.onrender.com`)
-
-**Note**: You'll need to redeploy the frontend after adding this environment variable for it to take effect.
-
-### Option B: Using render.yaml (Alternative)
-
-If you prefer, you can use the `render.yaml` file included in the repository. However, Render's static sites are best configured through the dashboard. The `render.yaml` file is mainly useful for the backend service.
+The frontend will be accessible at the same URL as your backend (e.g., `https://pama-lodge.onrender.com`), and the API will be at `https://pama-lodge.onrender.com/api/`.
 
 ## Quick Deployment Steps Summary
 
 1. **Create PostgreSQL Database** on Render
-2. **Create Backend Web Service**:
-   - Root Directory: `backend`
-   - Build: `pip install -r requirements.txt && python manage.py collectstatic --noinput`
-   - Start: `gunicorn pama_lodge.wsgi:application`
+2. **Create Web Service** (serves both backend and frontend):
+   - Root Directory: (empty - root of repo)
+   - Build: `cd frontend && npm install && npm run build && cd .. && cd backend && pip install -r requirements.txt && python manage.py collectstatic --noinput`
+   - Start: `cd backend && gunicorn pama_lodge.wsgi:application`
    - Set environment variables (see below)
-3. **Create Frontend Static Site**:
-   - Root Directory: `frontend`
-   - Build: `npm install && npm run build`
-   - Publish: `dist`
-   - Set `VITE_API_URL` environment variable
-4. **Run migrations** via backend Shell
-5. **Update CORS** in backend environment variables with frontend URL
+3. **Run migrations** via service Shell
+4. **Access your app** at the service URL (frontend and API on same domain)
 
 ## Part 4: Post-Deployment Checklist
 
-1. ✅ Backend deployed and accessible
+1. ✅ Service deployed and accessible
 2. ✅ Database migrations run
 3. ✅ Superuser created
 4. ✅ Rooms created (`python manage.py create_rooms`)
-5. ✅ Frontend deployed and accessible
-6. ✅ Frontend can connect to backend API
-7. ✅ CORS configured correctly
-8. ✅ Environment variables set
+5. ✅ Frontend accessible at service URL
+6. ✅ API accessible at `/api/` endpoint
+7. ✅ Environment variables set
 
 ## Troubleshooting
 
-### Backend Issues
+### Service Issues
 
 - **Static files not loading**: Ensure `collectstatic` runs in build command
 - **Database connection errors**: Check `DATABASE_URL` is correct (use Internal URL)
-- **CORS errors**: Verify `CORS_ALLOWED_ORIGINS` includes your frontend URL
-
-### Frontend Issues
-
-- **API calls failing**: Check `VITE_API_URL` environment variable
-- **Build fails**: Check Node version compatibility
-- **404 errors**: Verify `Publish Directory` is `dist`
+- **Frontend not loading**: Verify frontend build completed successfully in build logs
+- **404 errors on routes**: Ensure the catch-all route in `urls.py` is working
+- **Build fails**: Check Node version compatibility (Render should auto-detect)
 
 ## Environment Variables Reference
 
-### Backend (in Render Dashboard)
+### Service (in Render Dashboard)
 ```
 SECRET_KEY=your-secret-key
 DEBUG=False
-ALLOWED_HOSTS=your-backend-url.onrender.com
+ALLOWED_HOSTS=your-service-url.onrender.com
 DATABASE_URL=postgresql://user:password@host:port/dbname
-CORS_ALLOWED_ORIGINS=https://your-frontend-url.onrender.com
 ```
 
-### Frontend (in Render Dashboard)
-```
-VITE_API_URL=https://your-backend-url.onrender.com
-```
+**Note**: Since frontend and backend are on the same domain, no CORS configuration is needed.
 
 ## Custom Domains
 

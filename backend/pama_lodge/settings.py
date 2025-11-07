@@ -130,7 +130,15 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+# Frontend build directory (React app)
+# This directory contains the built React app (index.html and assets)
+FRONTEND_DIR = BASE_DIR.parent / 'frontend' / 'dist'
+STATICFILES_DIRS = [
+    str(FRONTEND_DIR),
+] if FRONTEND_DIR.exists() else []
+
 # WhiteNoise configuration for serving static files
+# WhiteNoise will serve all files from STATICFILES_DIRS and STATIC_ROOT
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type

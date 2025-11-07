@@ -185,7 +185,31 @@ Pama Lodge/
 
 ## Deployment
 
-For deploying to production, see [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md) for detailed instructions on deploying to Render.
+The frontend is built and served from the Django backend. For deploying to production, see [RENDER_DEPLOYMENT.md](./RENDER_DEPLOYMENT.md) for detailed instructions on deploying to Render.
+
+### Building the Frontend
+
+To build the frontend for production:
+
+**Windows:**
+```bash
+build_frontend.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x build_frontend.sh
+./build_frontend.sh
+```
+
+Or manually:
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+The built files will be in `frontend/dist/` and Django will serve them automatically.
 
 ## Notes
 

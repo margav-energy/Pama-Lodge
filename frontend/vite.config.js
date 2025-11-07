@@ -13,5 +13,11 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    // Ensure proper base path for production
+    base: '/',
+  },
 })
 

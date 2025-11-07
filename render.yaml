@@ -6,12 +6,13 @@ services:
     user: pama_lodge_user
     plan: free
 
-  # Django Backend
+  # Django Backend with React Frontend
+  # Frontend is built and served from the same service
   - type: web
-    name: pama-lodge-backend
+    name: pama-lodge
     runtime: python
-    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
-    startCommand: gunicorn pama_lodge.wsgi:application
+    buildCommand: cd frontend && npm install && npm run build && cd .. && cd backend && pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: cd backend && gunicorn pama_lodge.wsgi:application
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -22,12 +23,5 @@ services:
           name: pama-lodge-db
           property: connectionString
       - key: ALLOWED_HOSTS
-        value: pama-lodge-backend.onrender.com
-      - key: CORS_ALLOWED_ORIGINS
-        value: https://pama-lodge-frontend.onrender.com
-    rootDir: backend
-
-  # React Frontend (Static Site)
-  # Note: Static sites on Render are configured via the dashboard
-  # This is a reference - use the dashboard for static site deployment
+        value: pama-lodge.onrender.com
 
