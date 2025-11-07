@@ -21,11 +21,22 @@ frontend_dir = os.path.join(settings.BASE_DIR.parent, 'frontend', 'dist')
 # Vite builds assets in /assets/ directory
 def serve_react_assets(request, path):
     """Serve static assets from the React build directory."""
-    assets_dir = os.path.join(frontend_dir, 'assets')
-    file_path = os.path.join(assets_dir, path)
-    if os.path.exists(file_path) and os.path.isfile(file_path):
-        return serve(request, path, document_root=assets_dir)
-    return HttpResponseNotFound()
+    try:
+        assets_dir = os.path.join(frontend_dir, 'assets')
+        file_path = os.path.join(assets_dir, path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return serve(request, path, document_root=assets_dir)
+        # Try serving from frontend_dir directly (for files like vite.svg)
+        file_path = os.path.join(frontend_dir, path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return serve(request, path, document_root=frontend_dir)
+        return HttpResponseNotFound()
+    except Exception as e:
+        # Log error but don't expose it
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error serving asset {path}: {str(e)}")
+        return HttpResponseNotFound()
 
 # Serve React app for all non-API routes
 # This must be last to catch all other routes
