@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, Sum
+from django.db import models
 from django.utils import timezone
 from datetime import date
 from .models import Booking, User, Room, RoomIssue
@@ -29,9 +30,13 @@ class BookingViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
         
-        # Receptionist only sees authorized bookings, manager sees all
+        # Receptionist sees authorized bookings and their own pending bookings
+        # Rejected bookings are hidden from receptionists
         if user.is_receptionist():
-            queryset = queryset.filter(is_authorized=True)
+            queryset = queryset.filter(
+                models.Q(status='authorized') | 
+                (models.Q(status='pending') & models.Q(booked_by=user))
+            )
         
         # Exclude soft-deleted bookings by default (unless manager explicitly requests them)
         include_deleted = self.request.query_params.get('include_deleted', 'false').lower() == 'true'
@@ -39,6 +44,47 @@ class BookingViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(deleted_at__isnull=True)
         
         return queryset.order_by('-created_at')
+    
+    def get_object(self):
+        """Override to allow fetching deleted bookings when needed"""
+        # For restore action, we MUST include deleted bookings
+        if self.action == 'restore':
+            # Get all bookings including deleted ones for restore
+            queryset = Booking.objects.filter(is_original=True)
+            # No filtering by deleted_at - we need to find deleted bookings
+        # For versions and export_versions actions, include deleted bookings
+        elif self.action in ['versions', 'export_versions_excel']:
+            queryset = Booking.objects.filter(is_original=True)
+            if self.request.user.is_receptionist():
+                queryset = queryset.filter(
+                    models.Q(status='authorized') | 
+                    (models.Q(status='pending') & models.Q(booked_by=self.request.user))
+                )
+        # For retrieve action, check if include_deleted is requested
+        elif self.action == 'retrieve' and self.request.query_params.get('include_deleted', 'false').lower() == 'true':
+            queryset = Booking.objects.filter(is_original=True)
+            # Don't filter by deleted_at when include_deleted=true
+            if self.request.user.is_receptionist():
+                queryset = queryset.filter(
+                    models.Q(status='authorized') | 
+                    (models.Q(status='pending') & models.Q(booked_by=self.request.user))
+                )
+        else:
+            # Use default queryset (excludes deleted)
+            queryset = self.get_queryset()
+        
+        # Perform the lookup filtering
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
+        obj = queryset.filter(**filter_kwargs).first()
+        
+        if obj is None:
+            from rest_framework.exceptions import NotFound
+            raise NotFound("Booking not found.")
+        
+        # May raise a permission denied
+        self.check_object_permissions(self.request, obj)
+        return obj
     
     def get_serializer_class(self):
         if self.action == 'list':
@@ -168,34 +214,49 @@ class BookingViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def daily_totals(self, request):
-        """Get daily totals for bookings"""
+        """Get daily totals for bookings or total if no date provided"""
         target_date = request.query_params.get('date', None)
+        user = request.user
         
+        # Base queryset - exclude soft-deleted bookings and only authorized
+        bookings = Booking.objects.filter(
+            is_original=True,
+            deleted_at__isnull=True,
+            status='authorized'
+        )
+        
+        # Apply role-based filtering
+        if user.is_receptionist():
+            # Receptionists see all authorized bookings (already filtered above)
+            pass
+        # Managers see all authorized bookings
+        
+        # If date is provided, filter by that date
         if target_date:
             try:
                 target_date = date.fromisoformat(target_date)
+                bookings = bookings.filter(check_in_date=target_date)
             except ValueError:
                 return Response(
                     {"error": "Invalid date format. Use YYYY-MM-DD."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
         else:
-            target_date = timezone.now().date()
-        
-        bookings = Booking.objects.filter(
-            is_original=True,
-            check_in_date=target_date,
-            deleted_at__isnull=True  # Exclude soft-deleted bookings
-        )
+            # No date filter - return total for all bookings
+            target_date = None
         
         total_amount = bookings.aggregate(total=Sum('amount_ghs'))['total'] or 0
         total_bookings = bookings.count()
         
-        return Response({
-            'date': target_date,
+        response_data = {
             'total_bookings': total_bookings,
             'total_amount_ghs': float(total_amount)
-        })
+        }
+        
+        if target_date:
+            response_data['date'] = target_date
+        
+        return Response(response_data)
     
     @action(detail=True, methods=['post'])
     def authorize(self, request, pk=None):
@@ -209,8 +270,34 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking = self.get_object()
         authorized_by = request.data.get('authorized_by', request.user.get_full_name() or request.user.username)
         
-        booking.is_authorized = True
+        booking.status = 'authorized'
+        booking.is_authorized = True  # Keep for backward compatibility
         booking.authorized_by = authorized_by
+        booking.rejected_by = ''  # Clear rejection if previously rejected
+        booking.rejection_reason = ''  # Clear rejection reason
+        booking.save()
+        
+        serializer = self.get_serializer(booking)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a booking (manager only)"""
+        if not request.user.is_manager():
+            return Response(
+                {"detail": "Only managers can reject bookings."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        booking = self.get_object()
+        rejected_by = request.data.get('rejected_by', request.user.get_full_name() or request.user.username)
+        rejection_reason = request.data.get('rejection_reason', '')
+        
+        booking.status = 'rejected'
+        booking.is_authorized = False  # Keep for backward compatibility
+        booking.rejected_by = rejected_by
+        booking.rejection_reason = rejection_reason
+        booking.authorized_by = ''  # Clear authorization if previously authorized
         booking.save()
         
         serializer = self.get_serializer(booking)
@@ -225,6 +312,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # Use get_object() which now includes deleted bookings for restore action
         booking = self.get_object()
         
         if not booking.is_deleted:
@@ -264,12 +352,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         # Headers
         headers = [
-            'ID', 'Guest Name', 'ID/Telephone', 'Address/Location', 'Age',
+            'ID', 'Guest Name', 'Phone Number', 'Address/Location', 'Age',
             'Room Number', 'Room Type', 'Check-in Date', 'Check-in Time',
             'Check-out Date', 'Check-out Time', 'Payment Method',
             'Amount (GHS)', 'Cash Amount', 'MoMo Amount', 'MoMo Network',
             'MoMo Number', 'Booked By', 'Created At', 'Last Edited By',
-            'Updated At', 'Authorized By', 'Is Authorized', 'Version Number'
+            'Updated At', 'Authorized/Rejected By', 'Status', 'Rejection Reason', 'Version Number'
         ]
         
         # Style headers
@@ -306,9 +394,10 @@ class BookingViewSet(viewsets.ModelViewSet):
             ws.cell(row=row_num, column=19, value=booking.created_at.strftime('%Y-%m-%d %H:%M:%S'))
             ws.cell(row=row_num, column=20, value=booking.last_edited_by.username if booking.last_edited_by else '')
             ws.cell(row=row_num, column=21, value=booking.updated_at.strftime('%Y-%m-%d %H:%M:%S'))
-            ws.cell(row=row_num, column=22, value=booking.authorized_by)
-            ws.cell(row=row_num, column=23, value='Yes' if booking.is_authorized else 'No')
-            ws.cell(row=row_num, column=24, value=booking.version_number)
+            ws.cell(row=row_num, column=22, value=booking.authorized_by or booking.rejected_by or '')
+            ws.cell(row=row_num, column=23, value=booking.get_status_display())
+            ws.cell(row=row_num, column=24, value=booking.rejection_reason or '')
+            ws.cell(row=row_num, column=25, value=booking.version_number)
         
         # Auto-adjust column widths
         for column in ws.columns:

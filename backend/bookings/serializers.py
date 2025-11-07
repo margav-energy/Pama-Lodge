@@ -74,12 +74,14 @@ class BookingSerializer(serializers.ModelSerializer):
             'momo_network', 'momo_number',
             'booked_by', 'booked_by_name',
             'created_at', 'updated_at', 'last_edited_by', 'last_edited_by_name',
-            'authorized_by', 'is_authorized', 'is_original', 'original_booking',
+            'status', 'authorized_by', 'rejected_by', 'rejection_reason', 'is_authorized', 
+            'is_pending', 'is_rejected', 'is_original', 'original_booking',
             'version_number', 'versions', 'deleted_at', 'deleted_by', 'is_deleted', 'can_restore'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'booked_by', 'last_edited_by', 
                            'is_original', 'original_booking', 'version_number', 'deleted_at', 
-                           'deleted_by', 'is_deleted', 'can_restore']
+                           'deleted_by', 'is_deleted', 'can_restore', 'status', 'is_pending', 
+                           'is_rejected', 'is_authorized']
     
     def validate(self, attrs):
         """Validate MoMo fields, age, and check-in/check-out times"""
@@ -304,7 +306,7 @@ class BookingListSerializer(serializers.ModelSerializer):
             'id', 'name', 'age', 'room_no', 'check_in_date', 'check_in_time',
             'check_out_date', 'check_out_time', 'amount_ghs', 'payment_method',
             'cash_amount', 'momo_amount', 'momo_network', 'momo_number',
-            'booked_by_name', 'created_at', 'is_authorized', 'version_number'
+            'booked_by_name', 'created_at', 'status', 'is_authorized', 'version_number'
         ]
 
 

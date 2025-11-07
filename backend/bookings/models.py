@@ -126,9 +126,30 @@ class Booking(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     last_edited_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='bookings_edited')
     
-    # Authorization
+    # Authorization Status
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('authorized', 'Authorized'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     authorized_by = models.CharField(max_length=255, blank=True)
+    rejected_by = models.CharField(max_length=255, blank=True)
+    rejection_reason = models.TextField(blank=True, help_text="Reason for rejection")
+    
+    # Legacy field for backward compatibility (deprecated, use status instead)
     is_authorized = models.BooleanField(default=False)
+    
+    @property
+    def is_pending(self):
+        """Check if booking is pending authorization"""
+        return self.status == 'pending'
+    
+    @property
+    def is_rejected(self):
+        """Check if booking is rejected"""
+        return self.status == 'rejected'
     
     # Soft delete
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -156,7 +177,8 @@ class Booking(models.Model):
     class Meta:
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['is_original', 'is_authorized', 'deleted_at']),
+            models.Index(fields=['is_original', 'status', 'deleted_at']),
+            models.Index(fields=['is_original', 'is_authorized', 'deleted_at']),  # Keep for backward compatibility
         ]
     
     def __str__(self):
