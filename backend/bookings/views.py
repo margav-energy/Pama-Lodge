@@ -5,8 +5,11 @@ from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, Sum
 from django.utils import timezone
 from datetime import date
-from .models import Booking, User, Room
-from .serializers import BookingSerializer, BookingListSerializer, UserSerializer, RoomSerializer, RoomAvailabilitySerializer
+from .models import Booking, User, Room, RoomIssue
+from .serializers import (
+    BookingSerializer, BookingListSerializer, UserSerializer, 
+    RoomSerializer, RoomAvailabilitySerializer, RoomIssueSerializer
+)
 from .permissions import IsManagerOrReadOnly, IsManager
 
 
@@ -234,4 +237,101 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         """Get current user information"""
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
+
+
+class RoomIssueViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing room issues, faults, and missing inventory.
+    Both managers and receptionists have full access to:
+    - View all issues
+    - Create new issues
+    - Update issues
+    - Mark issues as fixed
+    - View summaries and statistics
+    """
+    queryset = RoomIssue.objects.all()
+    serializer_class = RoomIssueSerializer
+    permission_classes = [IsAuthenticated]  # Both managers and receptionists have equal access
+    
+    def get_queryset(self):
+        # Both managers and receptionists can see all issues
+        queryset = RoomIssue.objects.all()
+        
+        # Filter by room if provided
+        room_id = self.request.query_params.get('room', None)
+        if room_id:
+            queryset = queryset.filter(room_id=room_id)
+        
+        # Filter by status if provided
+        status_filter = self.request.query_params.get('status', None)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        # Filter by issue_type if provided
+        issue_type = self.request.query_params.get('issue_type', None)
+        if issue_type:
+            queryset = queryset.filter(issue_type=issue_type)
+        
+        # Filter unresolved issues
+        unresolved = self.request.query_params.get('unresolved', None)
+        if unresolved and unresolved.lower() == 'true':
+            queryset = queryset.exclude(status__in=['fixed', 'resolved'])
+        
+        return queryset.order_by('-reported_at')
+    
+    @action(detail=True, methods=['post'])
+    def mark_fixed(self, request, pk=None):
+        """Mark an issue as fixed"""
+        issue = self.get_object()
+        resolution_notes = request.data.get('resolution_notes', '')
+        
+        issue.mark_as_fixed(request.user, notes=resolution_notes)
+        
+        serializer = self.get_serializer(issue)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def by_room(self, request):
+        """Get all issues for a specific room"""
+        room_id = request.query_params.get('room_id', None)
+        if not room_id:
+            return Response(
+                {"error": "room_id parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        issues = RoomIssue.objects.filter(room_id=room_id).order_by('-reported_at')
+        serializer = self.get_serializer(issues, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Get summary of room issues"""
+        total_issues = RoomIssue.objects.count()
+        unresolved = RoomIssue.objects.exclude(status__in=['fixed', 'resolved']).count()
+        
+        by_type = {}
+        for issue_type, display in RoomIssue.ISSUE_TYPE_CHOICES:
+            by_type[issue_type] = {
+                'display': display,
+                'count': RoomIssue.objects.filter(issue_type=issue_type).count(),
+                'unresolved': RoomIssue.objects.filter(
+                    issue_type=issue_type
+                ).exclude(status__in=['fixed', 'resolved']).count()
+            }
+        
+        by_status = {}
+        for status_val, display in RoomIssue.STATUS_CHOICES:
+            by_status[status_val] = {
+                'display': display,
+                'count': RoomIssue.objects.filter(status=status_val).count()
+            }
+        
+        return Response({
+            'total_issues': total_issues,
+            'unresolved': unresolved,
+            'resolved': total_issues - unresolved,
+            'by_type': by_type,
+            'by_status': by_status
+        })
 

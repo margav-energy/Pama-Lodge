@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import User, Booking, BookingVersion, Room
+from .models import User, Booking, BookingVersion, Room, RoomIssue
 
 
 class RoomSerializer(serializers.ModelSerializer):
@@ -305,4 +305,41 @@ class BookingListSerializer(serializers.ModelSerializer):
             'cash_amount', 'momo_amount', 'momo_network', 'momo_number',
             'booked_by_name', 'created_at', 'is_authorized', 'version_number'
         ]
+
+
+class RoomIssueSerializer(serializers.ModelSerializer):
+    room_number = serializers.CharField(source='room.room_number', read_only=True)
+    room_type_display = serializers.CharField(source='room.get_room_type_display', read_only=True)
+    reported_by_name = serializers.SerializerMethodField()
+    fixed_by_name = serializers.SerializerMethodField()
+    issue_type_display = serializers.CharField(source='get_issue_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    is_resolved = serializers.BooleanField(read_only=True)
+    
+    def get_reported_by_name(self, obj):
+        if obj.reported_by:
+            return obj.reported_by.get_full_name() or obj.reported_by.username
+        return None
+    
+    def get_fixed_by_name(self, obj):
+        if obj.fixed_by:
+            return obj.fixed_by.get_full_name() or obj.fixed_by.username
+        return None
+    
+    class Meta:
+        model = RoomIssue
+        fields = [
+            'id', 'room', 'room_number', 'room_type_display', 'issue_type', 'issue_type_display',
+            'title', 'description', 'status', 'status_display', 'priority', 'priority_display',
+            'reported_by', 'reported_by_name', 'reported_at',
+            'fixed_by', 'fixed_by_name', 'fixed_at', 'resolution_notes',
+            'created_at', 'updated_at', 'is_resolved'
+        ]
+        read_only_fields = ['reported_by', 'reported_at', 'created_at', 'updated_at']
+    
+    def create(self, validated_data):
+        # Set reported_by to current user
+        validated_data['reported_by'] = self.context['request'].user
+        return super().create(validated_data)
 

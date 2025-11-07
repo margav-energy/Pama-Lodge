@@ -1,13 +1,19 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import BookingForm from './pages/BookingForm'
-import BookingDetail from './pages/BookingDetail'
-import BookingList from './pages/BookingList'
-import PrivateRoute from './components/PrivateRoute'
-import Layout from './components/Layout'
-import OfflineIndicator from './components/OfflineIndicator'
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import BookingForm from "./pages/BookingForm";
+import BookingDetail from "./pages/BookingDetail";
+import BookingList from "./pages/BookingList";
+import RoomIssues from "./pages/RoomIssues";
+import PrivateRoute from "./components/PrivateRoute";
+import Layout from "./components/Layout";
+import OfflineIndicator from "./components/OfflineIndicator";
 
 function App() {
   return (
@@ -29,13 +35,13 @@ function App() {
             <Route path="bookings/new" element={<BookingForm />} />
             <Route path="bookings/:id" element={<BookingDetail />} />
             <Route path="bookings/:id/edit" element={<BookingForm />} />
+            <Route path="room-issues" element={<RoomIssues />} />
           </Route>
         </Routes>
         <OfflineIndicator />
       </Router>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
-
+export default App;

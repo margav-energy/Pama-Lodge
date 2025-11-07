@@ -156,3 +156,69 @@ class BookingVersion(models.Model):
     def __str__(self):
         return f"Version of {self.booking.name} - {self.edited_at}"
 
+
+class RoomIssue(models.Model):
+    """Track room issues, faults, and missing inventory"""
+    ISSUE_TYPE_CHOICES = [
+        ('missing_inventory', 'Missing Inventory'),
+        ('fault', 'Fault/Repair Needed'),
+        ('maintenance', 'Maintenance Required'),
+        ('other', 'Other'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('reported', 'Reported'),
+        ('in_progress', 'In Progress'),
+        ('fixed', 'Fixed'),
+        ('resolved', 'Resolved'),
+    ]
+    
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='issues')
+    issue_type = models.CharField(max_length=20, choices=ISSUE_TYPE_CHOICES, default='fault')
+    title = models.CharField(max_length=255, help_text="Brief description of the issue")
+    description = models.TextField(help_text="Detailed description of the issue or missing item")
+    
+    # Status tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='reported')
+    
+    # Reporting
+    reported_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='issues_reported')
+    reported_at = models.DateTimeField(auto_now_add=True)
+    
+    # Resolution
+    fixed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='issues_fixed')
+    fixed_at = models.DateTimeField(null=True, blank=True)
+    resolution_notes = models.TextField(blank=True, help_text="Notes about how the issue was resolved")
+    
+    # Additional info
+    priority = models.CharField(
+        max_length=10,
+        choices=[('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('urgent', 'Urgent')],
+        default='medium'
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-reported_at']
+        verbose_name = 'Room Issue'
+        verbose_name_plural = 'Room Issues'
+    
+    def __str__(self):
+        return f"Room {self.room.room_number} - {self.title} ({self.get_status_display()})"
+    
+    def mark_as_fixed(self, user, notes=''):
+        """Mark issue as fixed"""
+        from django.utils import timezone
+        self.status = 'fixed'
+        self.fixed_by = user
+        self.fixed_at = timezone.now()
+        if notes:
+            self.resolution_notes = notes
+        self.save()
+    
+    def is_resolved(self):
+        """Check if issue is resolved"""
+        return self.status in ['fixed', 'resolved']
+

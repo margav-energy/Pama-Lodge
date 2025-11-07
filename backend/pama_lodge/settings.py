@@ -5,8 +5,13 @@ Django settings for pama_lodge project.
 from pathlib import Path
 from decouple import config
 from datetime import timedelta
-import dj_database_url
 import os
+
+# Optional import for DATABASE_URL support (for production deployments)
+try:
+    import dj_database_url
+except ImportError:
+    dj_database_url = None
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -78,7 +83,7 @@ WSGI_APPLICATION = 'pama_lodge.wsgi.application'
 
 # Use DATABASE_URL from environment (Render provides this)
 DATABASE_URL = config('DATABASE_URL', default=None)
-if DATABASE_URL:
+if DATABASE_URL and dj_database_url:
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
@@ -102,21 +107,9 @@ else:
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
+# Password validators removed - no restrictions on password creation
 
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
+AUTH_PASSWORD_VALIDATORS = []
 
 
 # Internationalization
