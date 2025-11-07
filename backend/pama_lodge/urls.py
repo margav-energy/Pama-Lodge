@@ -22,14 +22,18 @@ frontend_dir = os.path.join(settings.BASE_DIR.parent, 'frontend', 'dist')
 def serve_react_assets(request, path):
     """Serve static assets from the React build directory."""
     try:
+        # Path already includes the filename (e.g., "index-FM4_THsw.css")
         assets_dir = os.path.join(frontend_dir, 'assets')
         file_path = os.path.join(assets_dir, path)
+        
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return serve(request, path, document_root=assets_dir)
+        
         # Try serving from frontend_dir directly (for files like vite.svg)
         file_path = os.path.join(frontend_dir, path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return serve(request, path, document_root=frontend_dir)
+        
         return HttpResponseNotFound()
     except Exception as e:
         # Log error but don't expose it
@@ -57,7 +61,7 @@ def serve_react_app(request):
 
 # Serve assets from /assets/ (Vite build output)
 urlpatterns += [
-    re_path(r'^assets/.*$', serve_react_assets),
+    re_path(r'^assets/(?P<path>.*)$', serve_react_assets),
 ]
 
 # Catch all other routes and serve React app (for client-side routing)
