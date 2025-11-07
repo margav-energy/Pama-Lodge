@@ -6,6 +6,7 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import FileResponse, HttpResponseNotFound
+from django.views.static import serve
 import os
 
 urlpatterns = [
@@ -13,15 +14,26 @@ urlpatterns = [
     path('api/', include('bookings.urls')),
 ]
 
+# Frontend build directory
+frontend_dir = os.path.join(settings.BASE_DIR.parent, 'frontend', 'dist')
+
+# Serve React app static assets (JS, CSS from assets folder)
+# Vite builds assets in /assets/ directory
+def serve_react_assets(request, path):
+    """Serve static assets from the React build directory."""
+    assets_dir = os.path.join(frontend_dir, 'assets')
+    file_path = os.path.join(assets_dir, path)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return serve(request, path, document_root=assets_dir)
+    return HttpResponseNotFound()
+
 # Serve React app for all non-API routes
 # This must be last to catch all other routes
 def serve_react_app(request):
     """
     Serve the React app's index.html for all non-API routes.
     This allows React Router to handle client-side routing.
-    Static assets (JS, CSS) are served by WhiteNoise from STATICFILES_DIRS.
     """
-    frontend_dir = os.path.join(settings.BASE_DIR.parent, 'frontend', 'dist')
     index_path = os.path.join(frontend_dir, 'index.html')
     
     if os.path.exists(index_path):
@@ -32,10 +44,15 @@ def serve_react_app(request):
             '<h1>Frontend not built</h1><p>Please run: npm run build in the frontend directory</p>'
         )
 
-# Catch all other routes and serve React app (for client-side routing)
-# Exclude API, admin, and static file routes
+# Serve assets from /assets/ (Vite build output)
 urlpatterns += [
-    re_path(r'^(?!api|admin|static).*$', serve_react_app),
+    re_path(r'^assets/.*$', serve_react_assets),
+]
+
+# Catch all other routes and serve React app (for client-side routing)
+# Exclude API, admin, static, and assets routes
+urlpatterns += [
+    re_path(r'^(?!api|admin|static|assets).*$', serve_react_app),
 ]
 
 # Serve static files in development
