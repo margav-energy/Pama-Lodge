@@ -320,14 +320,19 @@ class BookingAdmin(admin.ModelAdmin):
     list_display = ['name', 'room_no', 'check_in_date', 'amount_ghs', 'booked_by', 'status', 'is_deleted_display', 'created_at']
     list_filter = ['check_in_date', 'payment_method', 'status', 'deleted_at']
     search_fields = ['name', 'room_no', 'id_or_telephone']
-    actions = ['soft_delete_selected', 'restore_selected', 'export_excel']
+    actions = ['soft_delete_selected', 'restore_selected', 'permanent_delete_selected', 'export_excel']
     change_list_template = 'admin/bookings/booking/change_list.html'
+    change_form_template = 'admin/bookings/booking/change_form.html'
     
     def get_actions(self, request):
-        """Remove default delete action and keep only soft delete"""
+        """Remove default delete action and keep only soft delete and permanent delete"""
         actions = super().get_actions(request)
         if 'delete_selected' in actions:
             del actions['delete_selected']
+        # Only show permanent delete to managers
+        if not request.user.is_manager():
+            if 'permanent_delete_selected' in actions:
+                del actions['permanent_delete_selected']
         return actions
     
     def is_deleted_display(self, obj):
@@ -391,23 +396,77 @@ class BookingAdmin(admin.ModelAdmin):
             self.message_user(request, 'No deleted bookings selected to restore.', level='warning')
     restore_selected.short_description = "Restore selected deleted bookings"
     
+    def permanent_delete_selected(self, request, queryset):
+        """Permanently delete selected bookings (manager only)"""
+        if not request.user.is_manager():
+            self.message_user(request, 'Only managers can permanently delete bookings.', level='error')
+            return
+        
+        count = queryset.count()
+        # Delete all related booking versions first (if they exist)
+        for booking in queryset:
+            # Get all versions related to this booking
+            BookingVersion.objects.filter(booking=booking).delete()
+        
+        # Permanently delete the bookings
+        queryset.delete()
+        
+        self.message_user(
+            request, 
+            f'{count} booking(s) permanently deleted. This action cannot be undone.',
+            level='warning'
+        )
+    permanent_delete_selected.short_description = "PERMANENTLY DELETE selected bookings (cannot be undone)"
+    
     def delete_model(self, request, obj):
-        """Override delete to use soft delete"""
-        obj.deleted_at = timezone.now()
-        obj.deleted_by = request.user
-        obj.save()
-        self.message_user(request, f'Booking "{obj.name}" has been soft deleted.')
+        """Override delete to use soft delete by default, but allow permanent delete for managers"""
+        # Check if user wants permanent delete (via query parameter or POST data)
+        permanent = request.GET.get('permanent', 'false').lower() == 'true' or \
+                   request.POST.get('permanent', 'false').lower() == 'true'
+        
+        if permanent and request.user.is_manager():
+            # Permanently delete
+            BookingVersion.objects.filter(booking=obj).delete()  # Delete related versions
+            obj.delete()  # Permanently delete
+            self.message_user(
+                request, 
+                f'Booking "{obj.name}" has been permanently deleted. This action cannot be undone.',
+                level='warning'
+            )
+        else:
+            # Soft delete (default)
+            obj.deleted_at = timezone.now()
+            obj.deleted_by = request.user
+            obj.save()
+            self.message_user(request, f'Booking "{obj.name}" has been soft deleted.')
     
     def delete_queryset(self, request, queryset):
-        """Override bulk delete to use soft delete"""
-        count = queryset.filter(deleted_at__isnull=True).count()
-        for booking in queryset.filter(deleted_at__isnull=True):
-            booking.deleted_at = timezone.now()
-            booking.deleted_by = request.user
-            booking.save()
+        """Override bulk delete to use soft delete by default"""
+        # Check if user wants permanent delete
+        permanent = request.GET.get('permanent', 'false').lower() == 'true' or \
+                   request.POST.get('permanent', 'false').lower() == 'true'
         
-        if count > 0:
-            self.message_user(request, f'{count} booking(s) soft deleted successfully.')
+        if permanent and request.user.is_manager():
+            # Permanently delete
+            count = queryset.count()
+            for booking in queryset:
+                BookingVersion.objects.filter(booking=booking).delete()  # Delete related versions
+            queryset.delete()  # Permanently delete
+            self.message_user(
+                request, 
+                f'{count} booking(s) permanently deleted. This action cannot be undone.',
+                level='warning'
+            )
+        else:
+            # Soft delete (default)
+            count = queryset.filter(deleted_at__isnull=True).count()
+            for booking in queryset.filter(deleted_at__isnull=True):
+                booking.deleted_at = timezone.now()
+                booking.deleted_by = request.user
+                booking.save()
+            
+            if count > 0:
+                self.message_user(request, f'{count} booking(s) soft deleted successfully.')
     
     def export_excel(self, request, queryset):
         """Export bookings to Excel file"""
