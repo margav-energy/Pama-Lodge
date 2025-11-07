@@ -35,7 +35,7 @@ The frontend is now built and served from the Django backend. This means you onl
    - **Region**: Same as database
    - **Branch**: `main`
    - **Root Directory**: (leave empty - root of repository)
-   - **Runtime**: `Python 3`
+   - **Runtime**: `Python 3.12` (important: use Python 3.12, not 3.13, for psycopg2 compatibility)
    - **Build Command**: 
      ```bash
      cd frontend && npm install && npm run build && cd .. && cd backend && pip install -r requirements.txt && python manage.py collectstatic --noinput
