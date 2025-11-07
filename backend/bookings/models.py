@@ -130,13 +130,34 @@ class Booking(models.Model):
     authorized_by = models.CharField(max_length=255, blank=True)
     is_authorized = models.BooleanField(default=False)
     
+    # Soft delete
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='bookings_deleted')
+    
     # Version tracking
     is_original = models.BooleanField(default=True)
     original_booking = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='derived_bookings')
     version_number = models.IntegerField(default=1)
     
+    @property
+    def is_deleted(self):
+        """Check if booking is soft deleted"""
+        return self.deleted_at is not None
+    
+    @property
+    def can_restore(self):
+        """Check if booking can be restored (within 30 days)"""
+        if not self.deleted_at:
+            return False
+        from django.utils import timezone
+        from datetime import timedelta
+        return timezone.now() - self.deleted_at < timedelta(days=30)
+    
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['is_original', 'is_authorized', 'deleted_at']),
+        ]
     
     def __str__(self):
         return f"{self.name} - Room {self.room_no}"
