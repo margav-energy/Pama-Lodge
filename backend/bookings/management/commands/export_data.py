@@ -21,8 +21,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         output_dir = options['output_dir']
         
-        # Create output directory if it doesn't exist
+        # Create output directory if it doesn't exist (including parent directories)
         os.makedirs(output_dir, exist_ok=True)
+        
+        # Ensure the directory was created
+        if not os.path.exists(output_dir):
+            self.stdout.write(self.style.ERROR(f'Failed to create directory: {output_dir}'))
+            return
         
         self.stdout.write(self.style.SUCCESS(f'Exporting data to {output_dir}...'))
         
@@ -40,18 +45,18 @@ class Command(BaseCommand):
             self.stdout.write(f'Exporting {model} to {filepath}...')
             try:
                 call_command('dumpdata', model, '--indent', '2', '-o', filepath)
-                self.stdout.write(self.style.SUCCESS(f'✓ Exported {model}'))
+                self.stdout.write(self.style.SUCCESS(f'[OK] Exported {model}'))
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f'✗ Error exporting {model}: {str(e)}'))
+                self.stdout.write(self.style.ERROR(f'[ERROR] Error exporting {model}: {str(e)}'))
         
         # Also export all data together
         all_data_path = os.path.join(output_dir, 'all_data.json')
         self.stdout.write(f'Exporting all data to {all_data_path}...')
         try:
             call_command('dumpdata', 'bookings', '--indent', '2', '-o', all_data_path)
-            self.stdout.write(self.style.SUCCESS(f'✓ Exported all data'))
+            self.stdout.write(self.style.SUCCESS(f'[OK] Exported all data'))
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f'✗ Error exporting all data: {str(e)}'))
+            self.stdout.write(self.style.ERROR(f'[ERROR] Error exporting all data: {str(e)}'))
         
         self.stdout.write(self.style.SUCCESS(f'\nData export completed! Files saved in {output_dir}'))
 
