@@ -10,20 +10,69 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        # Add custom claims to token
-        token['role'] = getattr(user, 'role', 'receptionist')
-        token['username'] = user.username
+        # Add custom claims to token - use getattr for safety
+        try:
+            token['role'] = getattr(user, 'role', 'receptionist')
+            token['username'] = getattr(user, 'username', '') if hasattr(user, 'username') else str(user)
+        except Exception as e:
+            # Fallback if anything goes wrong - log but don't fail
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error adding custom claims to token: {e}")
+            token['role'] = 'receptionist'
+            token['username'] = str(user) if user else ''
         return token
     
     def validate(self, attrs):
-        data = super().validate(attrs)
-        # Add custom claims to response data
-        # self.user is set by parent validate() method
-        user = self.user
-        if user:
-            data['role'] = getattr(user, 'role', 'receptionist')
-            data['username'] = user.username
-        return data
+        """
+        Validate credentials and return token with user role.
+        Handles errors gracefully to prevent 500 errors.
+        """
+        try:
+            # Call parent validate which handles authentication
+            # This will raise ValidationError if credentials are invalid
+            data = super().validate(attrs)
+            
+            # Add custom claims to response data
+            # self.user is set by parent validate() method after successful authentication
+            user = getattr(self, 'user', None)
+            if user:
+                try:
+                    data['role'] = getattr(user, 'role', 'receptionist')
+                    data['username'] = getattr(user, 'username', '') if hasattr(user, 'username') else ''
+                except Exception as e:
+                    # If adding custom claims fails, still return the token
+                    # This ensures login works even if role/username access fails
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Error adding user data to response: {e}")
+                    # Set defaults if we can't get the actual values
+                    data['role'] = 'receptionist'
+                    data['username'] = ''
+            else:
+                # User not set - this shouldn't happen after successful validation
+                # but handle it gracefully
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning("User not set after successful validation")
+                data['role'] = 'receptionist'
+                data['username'] = ''
+            
+            return data
+            
+        except Exception as e:
+            # Log the error for debugging but re-raise ValidationError for authentication failures
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in token validation: {e}", exc_info=True)
+            
+            # Re-raise ValidationError from parent (for invalid credentials)
+            # This ensures proper 401 responses instead of 500
+            from rest_framework.exceptions import ValidationError
+            if isinstance(e, ValidationError):
+                raise
+            # For unexpected errors, raise as ValidationError to prevent 500
+            raise ValidationError({"detail": "Authentication failed. Please check your credentials."})
 
 
 class RoomSerializer(serializers.ModelSerializer):
