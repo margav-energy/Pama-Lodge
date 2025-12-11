@@ -5,12 +5,14 @@ Django REST API backend for Pama Lodge booking system.
 ## Setup
 
 1. Create a virtual environment:
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 2. Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -18,16 +20,31 @@ pip install -r requirements.txt
 3. Create a `.env` file based on `.env.example` and configure your database settings.
 
 4. Run migrations:
+
 ```bash
 python manage.py migrate
 ```
 
-5. Create a superuser:
+5. Run migrations and create superadmins:
+
+```bash
+python manage.py migrate
+python manage.py create_superadmins
+```
+
+This will create the required superadmin users:
+
+- Username: `Paul_Ayitey` | Password: `admin123`
+- Username: `naa_okailey_ayitey` | Password: `123`
+
+Alternatively, create a custom superuser:
+
 ```bash
 python manage.py createsuperuser
 ```
 
 6. Run the development server:
+
 ```bash
 python manage.py runserver
 ```
@@ -69,4 +86,3 @@ receptionist = User.objects.create_user(
 - `GET /api/bookings/{id}/versions/` - Get booking versions (manager only)
 - `GET /api/bookings/daily_totals/?date=YYYY-MM-DD` - Get daily totals
 - `POST /api/bookings/{id}/authorize/` - Authorize booking (manager only)
-

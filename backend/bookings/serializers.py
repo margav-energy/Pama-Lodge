@@ -1,6 +1,26 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import User, Booking, BookingVersion, Room, RoomIssue
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Custom token serializer to include user role in token"""
+    username_field = 'username'
+    
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        # Add custom claims
+        data['role'] = self.user.role
+        data['username'] = self.user.username
+        return data
+    
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['role'] = user.role
+        token['username'] = user.username
+        return token
 
 
 class RoomSerializer(serializers.ModelSerializer):
