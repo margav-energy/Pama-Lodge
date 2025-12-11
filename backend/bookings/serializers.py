@@ -6,21 +6,24 @@ from .models import User, Booking, BookingVersion, Room, RoomIssue
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Custom token serializer to include user role in token"""
-    username_field = 'username'
-    
-    def validate(self, attrs):
-        data = super().validate(attrs)
-        # Add custom claims
-        data['role'] = self.user.role
-        data['username'] = self.user.username
-        return data
     
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        token['role'] = user.role
+        # Add custom claims to token
+        token['role'] = getattr(user, 'role', 'receptionist')
         token['username'] = user.username
         return token
+    
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        # Add custom claims to response data
+        # self.user is set by parent validate() method
+        user = self.user
+        if user:
+            data['role'] = getattr(user, 'role', 'receptionist')
+            data['username'] = user.username
+        return data
 
 
 class RoomSerializer(serializers.ModelSerializer):

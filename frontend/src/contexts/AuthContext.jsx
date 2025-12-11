@@ -55,9 +55,16 @@ export const AuthProvider = ({ children }) => {
       await fetchUser()
       return { success: true }
     } catch (error) {
+      console.error('Login error:', error)
+      console.error('Error response:', error.response?.data)
+      console.error('Error status:', error.response?.status)
       return {
         success: false,
-        error: error.response?.data?.detail || 'Login failed',
+        error: error.response?.data?.detail || 
+               error.response?.data?.error || 
+               error.response?.data?.message ||
+               error.message || 
+               'Login failed. Please check your credentials.',
       }
     }
   }
