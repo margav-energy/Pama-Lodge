@@ -13,25 +13,21 @@ The superadmins are created automatically via a data migration (`0010_create_sup
 In your Render service settings, set the **Start Command** to:
 
 ```bash
-python manage.py migrate && gunicorn pama_lodge.wsgi:application
-```
-
-The `migrate` command will:
-
-1. Apply all database migrations
-2. **Automatically create the superadmin users** (via migration 0010)
-
-That's it! No shell access needed. The superadmins will be created automatically.
-
-### Alternative: Manual Creation (if needed)
-
-If for some reason the migration doesn't run, you can also use the management command. Add this to your start command:
-
-```bash
 python manage.py migrate && python manage.py create_superadmins && gunicorn pama_lodge.wsgi:application
 ```
 
-But this is usually not necessary since the migration handles it automatically.
+This command will:
+
+1. Apply all database migrations (including the automatic superadmin creation migration)
+2. **Explicitly run the create_superadmins command** as a backup to ensure users exist
+3. Start the Gunicorn server
+
+**Why both?** The migration creates users automatically, but running the management command ensures they exist even if:
+- The migration was already run before
+- There were any issues during migration
+- The database was reset
+
+This is the safest approach and ensures superadmins are always available.
 
 ## Superadmin Credentials
 

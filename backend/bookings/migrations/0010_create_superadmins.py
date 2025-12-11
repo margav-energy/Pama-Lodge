@@ -8,23 +8,20 @@ def create_superadmins(apps, schema_editor):
     User = apps.get_model('bookings', 'User')
     
     # Superadmin 1: Paul_Ayitey
-    user1, created1 = User.objects.get_or_create(
-        username='Paul_Ayitey',
-        defaults={
-            'email': 'paul.ayitey@margav.energy',
-            'first_name': 'Paul',
-            'last_name': 'Ayitey',
-            'is_staff': True,
-            'is_superuser': True,
-            'is_active': True,
-            'role': 'manager'
-        }
-    )
-    if created1:
-        user1.set_password('admin123')
-        user1.save()
-    else:
-        # Update existing user to ensure correct permissions
+    try:
+        user1, created1 = User.objects.get_or_create(
+            username='Paul_Ayitey',
+            defaults={
+                'email': 'paul.ayitey@margav.energy',
+                'first_name': 'Paul',
+                'last_name': 'Ayitey',
+                'is_staff': True,
+                'is_superuser': True,
+                'is_active': True,
+                'role': 'manager'
+            }
+        )
+        # Always set password and permissions (in case user exists but password is wrong)
         user1.set_password('admin123')
         user1.is_staff = True
         user1.is_superuser = True
@@ -34,25 +31,25 @@ def create_superadmins(apps, schema_editor):
         user1.first_name = 'Paul'
         user1.last_name = 'Ayitey'
         user1.save()
+        print(f"{'Created' if created1 else 'Updated'} superuser: {user1.username}")
+    except Exception as e:
+        print(f"Error creating/updating Paul_Ayitey: {e}")
 
     # Superadmin 2: naa_okailey_ayitey
-    user2, created2 = User.objects.get_or_create(
-        username='naa_okailey_ayitey',
-        defaults={
-            'email': 'naa.okailey@margav.energy',
-            'first_name': 'Naa',
-            'last_name': 'Okailey Ayitey',
-            'is_staff': True,
-            'is_superuser': True,
-            'is_active': True,
-            'role': 'manager'
-        }
-    )
-    if created2:
-        user2.set_password('123')
-        user2.save()
-    else:
-        # Update existing user to ensure correct permissions
+    try:
+        user2, created2 = User.objects.get_or_create(
+            username='naa_okailey_ayitey',
+            defaults={
+                'email': 'naa.okailey@margav.energy',
+                'first_name': 'Naa',
+                'last_name': 'Okailey Ayitey',
+                'is_staff': True,
+                'is_superuser': True,
+                'is_active': True,
+                'role': 'manager'
+            }
+        )
+        # Always set password and permissions (in case user exists but password is wrong)
         user2.set_password('123')
         user2.is_staff = True
         user2.is_superuser = True
@@ -62,6 +59,9 @@ def create_superadmins(apps, schema_editor):
         user2.first_name = 'Naa'
         user2.last_name = 'Okailey Ayitey'
         user2.save()
+        print(f"{'Created' if created2 else 'Updated'} superuser: {user2.username}")
+    except Exception as e:
+        print(f"Error creating/updating naa_okailey_ayitey: {e}")
 
 
 def reverse_create_superadmins(apps, schema_editor):
