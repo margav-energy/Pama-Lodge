@@ -82,9 +82,9 @@ WSGI_APPLICATION = 'pama_lodge.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 # Use DATABASE_URL from environment (Render/Neon provides this)
-DATABASE_URL = config('DATABASE_URL', default='')
-# Only use DATABASE_URL if it's set and not empty, and dj_database_url is available
-if DATABASE_URL and DATABASE_URL.strip() and dj_database_url:
+DATABASE_URL = config('DATABASE_URL', default=None)
+# Only use DATABASE_URL if it's set, not empty, and dj_database_url is available
+if DATABASE_URL and isinstance(DATABASE_URL, str) and DATABASE_URL.strip() and dj_database_url:
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
