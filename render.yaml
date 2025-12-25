@@ -1,12 +1,6 @@
 services:
-  # PostgreSQL Database
-  - type: postgresql
-    name: pama-lodge-db
-    databaseName: pama_lodge
-    user: pama_lodge_user
-    plan: free
-
   # Backend (serves frontend build through Django + whitenoise)
+  # Using Neon PostgreSQL (DATABASE_URL set in Render dashboard)
   - type: web
     name: pama-lodge
     runtime: python-3.12
@@ -16,16 +10,13 @@ services:
       cd backend && pip install -r requirements.txt
       cd backend && python manage.py collectstatic --noinput
     startCommand: |
-      cd backend
-      gunicorn pama_lodge.wsgi:application
+      cd backend && python manage.py migrate && python manage.py create_superadmins && gunicorn pama_lodge.wsgi:application
     envVars:
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
         value: False
-      - key: DATABASE_URL
-        fromDatabase:
-          name: pama-lodge-db
-          property: connectionString
+      # DATABASE_URL: Set this manually in Render dashboard with your Neon connection string
+      # Go to Environment tab → Add DATABASE_URL → Paste your Neon connection string
       - key: ALLOWED_HOSTS
         value: pama-lodge.onrender.com,*.onrender.com
