@@ -6,10 +6,12 @@ from django.db.models import Q, Sum
 from django.db import models
 from django.utils import timezone
 from datetime import date
-from .models import Booking, User, Room, RoomIssue
+from .models import Booking, User, Room, RoomIssue, Notification
 from .serializers import (
-    BookingSerializer, BookingListSerializer, UserSerializer, 
-    RoomSerializer, RoomAvailabilitySerializer, RoomIssueSerializer
+    BookingSerializer, BookingListSerializer, UserSerializer, ChangePasswordSerializer,
+    SetPasswordSerializer,
+    RoomSerializer, RoomAvailabilitySerializer, RoomIssueSerializer,
+    NotificationSerializer,
 )
 from .permissions import IsManagerOrReadOnly, IsManager
 
@@ -526,12 +528,29 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
-    
+
     @action(detail=False, methods=['get'])
     def me(self, request):
         """Get current user information"""
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='change-password')
+    def change_password(self, request):
+        """Change the current user's password. Requires current_password and new_password."""
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'detail': 'Password changed successfully.'})
+
+    @action(detail=True, methods=['post'], url_path='set-password', permission_classes=[IsAuthenticated, IsManager])
+    def set_password(self, request, pk=None):
+        """Manager-only: set another user's password (no current password required)."""
+        user = self.get_object()
+        serializer = SetPasswordSerializer(data=request.data, context={'user': user})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'detail': f'Password for {user.username} updated successfully.'})
 
 
 class RoomIssueViewSet(viewsets.ModelViewSet):
@@ -581,6 +600,15 @@ class RoomIssueViewSet(viewsets.ModelViewSet):
         resolution_notes = request.data.get('resolution_notes', '')
         
         issue.mark_as_fixed(request.user, notes=resolution_notes)
+        
+        # Notify all staff that issue was fixed
+        room_num = issue.room.room_number if issue.room else '—'
+        Notification.objects.create(
+            notification_type='issue_fixed',
+            title='Issue fixed',
+            message=f'Room {room_num} — {issue.title}',
+            link='/room-issues',
+        )
         
         serializer = self.get_serializer(issue)
         return Response(serializer.data)
@@ -705,4 +733,33 @@ class RoomIssueViewSet(viewsets.ModelViewSet):
         
         wb.save(response)
         return response
+
+
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """List and mark notifications as read. Notifications are created when reservations are made or issues reported/fixed."""
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.all().order_by('-created_at')
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        """Mark a single notification as read for the current user."""
+        notification = self.get_object()
+        notification.read_by.add(request.user)
+        serializer = self.get_serializer(notification)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='mark-all-read')
+    def mark_all_read(self, request):
+        """Mark all notifications as read for the current user."""
+        for notification in Notification.objects.all():
+            notification.read_by.add(request.user)
+        return Response({'status': 'ok'})
 

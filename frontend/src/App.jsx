@@ -11,6 +11,8 @@ import BookingForm from "./pages/BookingForm";
 import BookingDetail from "./pages/BookingDetail";
 import BookingList from "./pages/BookingList";
 import RoomIssues from "./pages/RoomIssues";
+import Settings from "./pages/Settings";
+import NotificationsPage from "./pages/NotificationsPage";
 import PrivateRoute from "./components/PrivateRoute";
 import Layout from "./components/Layout";
 import OfflineIndicator from "./components/OfflineIndicator";
@@ -36,6 +38,8 @@ function App() {
             <Route path="bookings/:id" element={<BookingDetail />} />
             <Route path="bookings/:id/edit" element={<BookingForm />} />
             <Route path="room-issues" element={<RoomIssues />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="notifications" element={<NotificationsPage />} />
           </Route>
         </Routes>
         <OfflineIndicator />

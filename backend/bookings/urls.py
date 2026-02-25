@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .serializers import CustomTokenObtainPairSerializer
-from .views import BookingViewSet, UserViewSet, RoomViewSet, RoomIssueViewSet
+from .views import BookingViewSet, UserViewSet, RoomViewSet, RoomIssueViewSet, NotificationViewSet
 from . import views
 
 router = DefaultRouter()
@@ -10,6 +10,7 @@ router.register(r'bookings', BookingViewSet, basename='booking')
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'rooms', RoomViewSet, basename='room')
 router.register(r'room-issues', RoomIssueViewSet, basename='room-issue')
+router.register(r'notifications', NotificationViewSet, basename='notification')
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer

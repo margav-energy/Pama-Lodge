@@ -4,13 +4,14 @@ from django.contrib.auth.forms import UserCreationForm
 from django import forms
 from django.utils import timezone
 from django.utils.html import format_html
+from django.urls import reverse
 from django.db.models import Count, Sum, Q
 from django.utils import timezone as tz
 from django.http import HttpResponse
 from datetime import timedelta
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
-from .models import User, Booking, BookingVersion, Room, RoomIssue
+from .models import User, Booking, BookingVersion, Room, RoomIssue, Notification
 
 # Customize admin site header and title
 admin.site.site_header = 'Pama Lodge Administration'
@@ -143,10 +144,15 @@ class CustomUserCreationForm(UserCreationForm):
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     add_form = CustomUserCreationForm
-    list_display = ['username', 'first_name', 'last_name', 'email', 'role', 'is_staff', 'date_joined']
+    list_display = ['username', 'first_name', 'last_name', 'email', 'role', 'is_staff', 'date_joined', 'change_password_link']
     list_filter = ['role', 'is_staff', 'is_superuser']
     actions = ['export_excel']
     change_list_template = 'admin/bookings/user/change_list.html'
+
+    @admin.display(description='Change password')
+    def change_password_link(self, obj):
+        url = reverse('admin:auth_user_password_change', args=[obj.pk])
+        return format_html('<a href="{}">Change password</a>', url)
     
     # Fieldsets for editing existing users
     fieldsets = BaseUserAdmin.fieldsets + (
@@ -739,4 +745,13 @@ class RoomIssueAdmin(admin.ModelAdmin):
         wb.save(response)
         return response
     export_excel.short_description = "Export selected room issues to Excel"
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['id', 'notification_type', 'title', 'created_at']
+    list_filter = ['notification_type', 'created_at']
+    search_fields = ['title', 'message']
+    readonly_fields = ['notification_type', 'title', 'message', 'link', 'created_at', 'read_by']
+    date_hierarchy = 'created_at'
 

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import User, Booking, BookingVersion, Room, RoomIssue
+from .models import User, Booking, BookingVersion, Room, RoomIssue, Notification
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -100,6 +100,44 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'role', 'first_name', 'last_name']
         read_only_fields = ['id', 'role']
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(required=True, write_only=True)
+    new_password = serializers.CharField(required=True, write_only=True, min_length=8)
+
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Current password is incorrect.')
+        return value
+
+    def validate_new_password(self, value):
+        from django.contrib.auth.password_validation import validate_password
+        validate_password(value, self.context['request'].user)
+        return value
+
+    def save(self, **kwargs):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save(update_fields=['password'])
+        return user
+
+
+class SetPasswordSerializer(serializers.Serializer):
+    """For managers setting another user's password (no current password required)."""
+    new_password = serializers.CharField(required=True, write_only=True, min_length=8)
+
+    def validate_new_password(self, value):
+        from django.contrib.auth.password_validation import validate_password
+        validate_password(value, self.context['user'])
+        return value
+
+    def save(self, **kwargs):
+        user = self.context['user']
+        user.set_password(self.validated_data['new_password'])
+        user.save(update_fields=['password'])
+        return user
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -316,6 +354,14 @@ class BookingSerializer(serializers.ModelSerializer):
             is_manager_edit=False
         )
         
+        # Notify all staff of new reservation
+        Notification.objects.create(
+            notification_type='booking_created',
+            title='New reservation',
+            message=f'{booking.name} — Room {booking.room_no} — Check-in {booking.check_in_date}',
+            link=f'/bookings/{booking.id}',
+        )
+        
         return booking
     
     def update(self, instance, validated_data):
@@ -416,5 +462,30 @@ class RoomIssueSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Set reported_by to current user
         validated_data['reported_by'] = self.context['request'].user
-        return super().create(validated_data)
+        issue = super().create(validated_data)
+        # Notify all staff of new issue
+        room_num = issue.room.room_number if issue.room else '—'
+        Notification.objects.create(
+            notification_type='issue_reported',
+            title='Issue reported',
+            message=f'Room {room_num} — {issue.title}',
+            link='/room-issues',
+        )
+        return issue
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    notification_type_display = serializers.CharField(source='get_notification_type_display', read_only=True)
+    is_read = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'notification_type', 'notification_type_display', 'title', 'message', 'link', 'created_at', 'is_read']
+        read_only_fields = ['notification_type', 'title', 'message', 'link', 'created_at']
+
+    def get_is_read(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user:
+            return False
+        return obj.read_by.filter(pk=request.user.pk).exists()
 

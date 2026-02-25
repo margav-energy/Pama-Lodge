@@ -21,13 +21,14 @@ class User(AbstractUser):
 
 class Room(models.Model):
     ROOM_TYPE_CHOICES = [
-        ('standard_fan', 'Standard (Fan)'),
-        ('standard_ac', 'Standard (AC)'),
-        ('twin_bed', 'Twin Bed Room'),
+        ('standard_full_night_ac', 'Standard full night with A/C'),
+        ('standard_fan_only', 'Standard - Fan only'),
+        ('short_stay_1_3_fan', 'Short stay 1-3 (Fan)'),
+        ('short_stay_1_3_ac', 'Short stay 1-3 (A/C)'),
     ]
     
     room_number = models.CharField(max_length=10, unique=True)
-    room_type = models.CharField(max_length=20, choices=ROOM_TYPE_CHOICES)
+    room_type = models.CharField(max_length=25, choices=ROOM_TYPE_CHOICES)
     description = models.TextField(blank=True)
     price_per_night = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     is_available = models.BooleanField(default=True)
@@ -264,4 +265,25 @@ class RoomIssue(models.Model):
     def is_resolved(self):
         """Check if issue is resolved"""
         return self.status in ['fixed', 'resolved']
+
+
+class Notification(models.Model):
+    """In-app notifications for reservations, issues reported, and issues fixed."""
+    TYPE_CHOICES = [
+        ('booking_created', 'Reservation made'),
+        ('issue_reported', 'Issue reported'),
+        ('issue_fixed', 'Issue fixed'),
+    ]
+    notification_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    link = models.CharField(max_length=500, blank=True, help_text='Frontend path e.g. /bookings/5 or /room-issues')
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_by = models.ManyToManyField(User, related_name='read_notifications', blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.get_notification_type_display()}: {self.title}"
 
