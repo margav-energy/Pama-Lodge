@@ -18,8 +18,8 @@ class Command(BaseCommand):
         for i in range(101, 111):
             room, created = Room.objects.get_or_create(
                 room_number=str(i),
+                room_type='standard_fan_only',
                 defaults={
-                    'room_type': 'standard_fan_only',
                     'description': room_descriptions['standard_fan_only'],
                     'price_per_night': 150.00,
                     'is_available': True
@@ -34,8 +34,8 @@ class Command(BaseCommand):
         for i in range(201, 206):
             room, created = Room.objects.get_or_create(
                 room_number=str(i),
+                room_type='standard_full_night_ac',
                 defaults={
-                    'room_type': 'standard_full_night_ac',
                     'description': room_descriptions['standard_full_night_ac'],
                     'price_per_night': 200.00,
                     'is_available': True
@@ -50,8 +50,8 @@ class Command(BaseCommand):
         for i in range(301, 304):
             room, created = Room.objects.get_or_create(
                 room_number=str(i),
+                room_type='short_stay_1_3_fan',
                 defaults={
-                    'room_type': 'short_stay_1_3_fan',
                     'description': room_descriptions['short_stay_1_3_fan'],
                     'price_per_night': 80.00,
                     'is_available': True
@@ -66,8 +66,8 @@ class Command(BaseCommand):
         for i in range(304, 307):
             room, created = Room.objects.get_or_create(
                 room_number=str(i),
+                room_type='short_stay_1_3_ac',
                 defaults={
-                    'room_type': 'short_stay_1_3_ac',
                     'description': room_descriptions['short_stay_1_3_ac'],
                     'price_per_night': 100.00,
                     'is_available': True

@@ -174,11 +174,12 @@ class BookingSerializer(serializers.ModelSerializer):
     versions = BookingVersionSerializer(many=True, read_only=True)
     momo_number = serializers.CharField(required=False, allow_blank=True)
     room_info = RoomSerializer(source='room', read_only=True)
+    room_id = serializers.IntegerField(required=False, write_only=True)
     
     class Meta:
         model = Booking
         fields = [
-            'id', 'name', 'id_or_telephone', 'address_location', 'age', 'room_no', 'room', 'room_info',
+            'id', 'name', 'id_or_telephone', 'address_location', 'age', 'room_no', 'room', 'room_id', 'room_info',
             'check_in_date', 'check_in_time', 'check_out_date', 'check_out_time',
             'payment_method', 'amount_ghs', 'cash_amount', 'momo_amount',
             'momo_network', 'momo_number',
@@ -315,14 +316,24 @@ class BookingSerializer(serializers.ModelSerializer):
         validated_data['is_original'] = True
         validated_data['version_number'] = 1
         
-        # Link room if room_no matches a Room object
+        # Link room by room_id (preferred) or fall back to room_no for legacy
+        room_id = validated_data.pop('room_id', None)
         room_no = validated_data.get('room_no')
-        if room_no:
+        
+        if room_id:
+            try:
+                room = Room.objects.get(id=room_id)
+                validated_data['room'] = room
+                validated_data['room_no'] = f"{room.room_number} ({room.get_room_type_display()})"
+            except Room.DoesNotExist:
+                pass
+        elif room_no:
+            # Legacy: try to match by room_number (only works when room numbers are unique)
             try:
                 room = Room.objects.get(room_number=room_no)
                 validated_data['room'] = room
-            except Room.DoesNotExist:
-                pass  # Room doesn't exist, keep room_no as string
+            except (Room.DoesNotExist, Room.MultipleObjectsReturned):
+                pass  # Keep room_no as string if no unique match
         
         booking = Booking.objects.create(**validated_data)
         
@@ -407,6 +418,16 @@ class BookingSerializer(serializers.ModelSerializer):
         if is_manager_edit:
             # Manager edits supersede, so increment version
             instance.version_number += 1
+        
+        # Handle room_id - link room and update room_no display
+        room_id = validated_data.pop('room_id', None)
+        if room_id:
+            try:
+                room = Room.objects.get(id=room_id)
+                instance.room = room
+                instance.room_no = f"{room.room_number} ({room.get_room_type_display()})"
+            except Room.DoesNotExist:
+                pass
         
         for attr, value in validated_data.items():
             setattr(instance, attr, value)

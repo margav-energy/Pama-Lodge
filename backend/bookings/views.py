@@ -436,6 +436,7 @@ class RoomViewSet(viewsets.ModelViewSet):
         check_in_date = request.query_params.get('check_in_date', None)
         check_out_date = request.query_params.get('check_out_date', None)
         room_type = request.query_params.get('room_type', None)
+        exclude_booking_id = request.query_params.get('exclude_booking_id', None)
         
         if not check_in_date:
             return Response(
@@ -458,8 +459,12 @@ class RoomViewSet(viewsets.ModelViewSet):
             rooms = rooms.filter(room_type=room_type)
         
         available_rooms = []
+        try:
+            exclude_id = int(exclude_booking_id) if exclude_booking_id else None
+        except (ValueError, TypeError):
+            exclude_id = None
         for room in rooms:
-            is_available = room.check_availability(check_in, check_out)
+            is_available = room.check_availability(check_in, check_out, exclude_booking_id=exclude_id)
             if is_available:
                 available_rooms.append({
                     'room_id': room.id,
@@ -497,7 +502,7 @@ class RoomViewSet(viewsets.ModelViewSet):
             current_booking = None
             if is_booked:
                 booking = Booking.objects.filter(
-                    room_no=room.room_number,
+                    room=room,
                     is_original=True,
                     check_in_date__lte=target_date
                 ).exclude(

@@ -27,7 +27,7 @@ class Room(models.Model):
         ('short_stay_1_3_ac', 'Short stay 1-3 (A/C)'),
     ]
     
-    room_number = models.CharField(max_length=10, unique=True)
+    room_number = models.CharField(max_length=10)
     room_type = models.CharField(max_length=25, choices=ROOM_TYPE_CHOICES)
     description = models.TextField(blank=True)
     price_per_night = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
@@ -36,7 +36,13 @@ class Room(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        ordering = ['room_number']
+        ordering = ['room_number', 'room_type']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['room_number', 'room_type'],
+                name='unique_room_number_per_type'
+            )
+        ]
     
     def __str__(self):
         return f"Room {self.room_number} ({self.get_room_type_display()})"
@@ -47,8 +53,9 @@ class Room(models.Model):
             return False
         
         # Get all bookings for this room that overlap with the requested dates
+        # Use room FK to correctly identify this specific room (allows same number, different types)
         bookings = Booking.objects.filter(
-            room_no=self.room_number,
+            room=self,
             is_original=True
         )
         

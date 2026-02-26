@@ -23,6 +23,7 @@ const BookingForm = () => {
     address_location: '',
     age: '',
     room_no: '',
+    room_id: '',
     check_in_date: '',
     check_in_time: '14:00', // Default: 2:00 PM
     check_out_date: '',
@@ -109,14 +110,14 @@ const BookingForm = () => {
   }, [formData.check_in_date, formData.check_out_date])
 
   useEffect(() => {
-    // Update selected room when room_no or availableRooms changes
-    if (formData.room_no && availableRooms.length > 0) {
-      const room = availableRooms.find(r => r.room_number === formData.room_no)
+    // Update selected room when room_id or availableRooms changes
+    if (formData.room_id && availableRooms.length > 0) {
+      const room = availableRooms.find(r => r.room_id === parseInt(formData.room_id, 10))
       setSelectedRoom(room || null)
-    } else if (!formData.room_no) {
+    } else if (!formData.room_id) {
       setSelectedRoom(null)
     }
-  }, [formData.room_no, availableRooms])
+  }, [formData.room_id, availableRooms])
 
   const fetchAvailableRooms = async () => {
     if (!formData.check_in_date) {
@@ -135,6 +136,11 @@ const BookingForm = () => {
         url += `&check_out_date=${checkOutDate}`
       }
       
+      // When editing, exclude current booking so its room shows as available
+      if (isEdit && id) {
+        url += `&exclude_booking_id=${id}`
+      }
+      
       console.log('Fetching available rooms from:', url)
       const response = await axios.get(url)
       console.log('Available rooms response:', response.data)
@@ -143,9 +149,9 @@ const BookingForm = () => {
       const rooms = Array.isArray(response.data) ? response.data : []
       setAvailableRooms(rooms)
       
-      // If current room_no is not in available rooms, clear it
-      if (formData.room_no && !rooms.find(r => r.room_number === formData.room_no)) {
-        setFormData(prev => ({ ...prev, room_no: '' }))
+      // If current room_id is not in available rooms, clear it
+      if (formData.room_id && !rooms.find(r => r.room_id === parseInt(formData.room_id, 10))) {
+        setFormData(prev => ({ ...prev, room_id: '' }))
         setSelectedRoom(null)
       }
     } catch (error) {
@@ -169,6 +175,7 @@ const BookingForm = () => {
         address_location: booking.address_location || '',
         age: booking.age || '',
         room_no: booking.room_no || '',
+        room_id: booking.room ? String(booking.room) : '',
         check_in_date: booking.check_in_date || '',
         check_in_time: booking.check_in_time || '14:00',
         check_out_date: booking.check_out_date || '',
@@ -334,6 +341,7 @@ const BookingForm = () => {
             address_location: '',
             age: '',
             room_no: '',
+            room_id: '',
             check_in_date: '',
             check_in_time: '14:00',
             check_out_date: '',
@@ -564,9 +572,9 @@ const BookingForm = () => {
                   </label>
                   {formData.check_in_date ? (
                     <select
-                      name="room_no"
+                      name="room_id"
                       required
-                      value={formData.room_no}
+                      value={formData.room_id}
                       onChange={handleChange}
                       disabled={loadingRooms}
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 bg-white"
@@ -576,7 +584,7 @@ const BookingForm = () => {
                         <option value="" disabled>No rooms available for selected dates</option>
                       ) : (
                         availableRooms.map((room) => (
-                          <option key={room.room_id} value={room.room_number}>
+                          <option key={room.room_id} value={room.room_id}>
                             {room.room_number} - {room.room_type_display} (₵{room.price_per_night}/night)
                           </option>
                         ))
@@ -585,11 +593,10 @@ const BookingForm = () => {
                   ) : (
                     <input
                       type="text"
-                      name="room_no"
-                      required
-                      value={formData.room_no}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
+                      name="room_id"
+                      value={formData.room_no || ''}
+                      readOnly
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg bg-gray-50"
                       placeholder="Select check-in date first"
                       disabled
                     />
